@@ -1,0 +1,32 @@
+version: '3'
+
+services:
+  nginx-modsecurity:
+    build: .
+    container_name: nginx-modsecurity
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./certs:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./modsecurity/modsecurity.conf:/etc/nginx/modsecurity/modsecurity.conf
+      - ./modsecurity/crs-setup.conf:/etc/nginx/modsecurity/crs-setup.conf
+      - ./modsecurity/rules:/etc/nginx/modsecurity/rules
+    environment:
+      - VIRTUAL_HOST=switch1.zentec.network
+      - LETSENCRYPT_HOST=switch1.zentec.network
+      - LETSENCRYPT_EMAIL=your-email@example.com
+
+  certbot:
+    image: certbot/certbot
+    container_name: certbot
+    volumes:
+      - ./certbot/www:/var/www/certbot
+      - ./certs:/etc/letsencrypt
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot; sleep 12h & wait $${!}; done;'"
+
+volumes:
+  certbot-www:
+  certs:
