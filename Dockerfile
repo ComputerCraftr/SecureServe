@@ -3,9 +3,6 @@ FROM alpine:latest
 
 # Install dependencies
 RUN apk update && apk add --no-cache \
-    nginx \
-    nginx-mod-http-modsecurity \
-    libmodsecurity \
     git \
     gcc \
     g++ \
@@ -25,13 +22,13 @@ RUN apk update && apk add --no-cache \
     libstdc++ \
     curl-dev \
     openssl \
-    openssl-dev
+    openssl-dev \
+    bash \
+    gettext
 
-# Clone ModSecurity v3 repository
-RUN git clone --depth 1 -b v3/master --single-branch https://github.com/SpiderLabs/ModSecurity /usr/local/src/ModSecurity \
+# Clone ModSecurity v3 repository with submodules
+RUN git clone --recursive --depth 1 -b v3.0.4 https://github.com/SpiderLabs/ModSecurity /usr/local/src/ModSecurity \
     && cd /usr/local/src/ModSecurity \
-    && git submodule init \
-    && git submodule update \
     && ./build.sh \
     && ./configure \
     && make \
@@ -46,7 +43,9 @@ RUN cd /tmp \
     && tar zxvf nginx-1.19.6.tar.gz \
     && cd nginx-1.19.6 \
     && ./configure --with-compat --add-dynamic-module=/usr/local/src/ModSecurity-nginx \
-    && make modules \
+    && make \
+    && make install \
+    && mkdir -p /etc/nginx/modules \
     && cp objs/ngx_http_modsecurity_module.so /etc/nginx/modules
 
 # Clean up
@@ -57,8 +56,8 @@ RUN apk del gcc g++ make libtool automake autoconf \
     && rm -rf /tmp/nginx-1.19.6 \
     && rm /tmp/nginx-1.19.6.tar.gz
 
-# Configure Nginx
-COPY nginx/nginx.conf /etc/nginx/nginx.conf
+# Copy Nginx configuration template
+COPY nginx/nginx.conf.template /etc/nginx/nginx.conf.template
 
 # Add ModSecurity configuration files
 COPY modsecurity/modsecurity.conf /etc/nginx/modsecurity/modsecurity.conf
@@ -66,11 +65,11 @@ COPY modsecurity/crs-setup.conf /etc/nginx/modsecurity/crs-setup.conf
 COPY modsecurity/rules /etc/nginx/modsecurity/rules
 
 # Create directories
-RUN mkdir -p /var/www/html
+RUN mkdir -p /var/www/html /var/www/certbot
 
 # Expose ports
 EXPOSE 80
 EXPOSE 443
 
-# Start Nginx
-CMD ["nginx", "-g", "daemon off;"]
+# Generate final Nginx configuration file from template
+CMD ["/bin/sh", "-c", "envsubst < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf && nginx -g 'daemon off;'"]
