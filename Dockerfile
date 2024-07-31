@@ -1,7 +1,7 @@
 # Stage 1: Build and install Nginx with ModSecurity
 FROM alpine:latest AS builder
 
-# Install dependencies
+# Install build dependencies
 RUN apk update && apk add --no-cache \
     nginx \
     git \
@@ -24,8 +24,7 @@ RUN apk update && apk add --no-cache \
     curl-dev \
     openssl \
     openssl-dev \
-    bash \
-    gettext
+    bash
 
 # Clone ModSecurity v3 repository with submodules
 RUN git clone --recursive --depth 1 -b v3.0.4 https://github.com/SpiderLabs/ModSecurity /usr/local/src/ModSecurity \
@@ -55,6 +54,7 @@ FROM alpine:latest
 
 # Copy necessary files from builder stage
 COPY --from=builder /etc/nginx/modules/ngx_http_modsecurity_module.so /etc/nginx/modules/ngx_http_modsecurity_module.so
+COPY --from=builder /usr/local/modsecurity /usr/local/modsecurity
 
 # Install runtime dependencies
 RUN apk update && apk add --no-cache \
