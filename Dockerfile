@@ -1,5 +1,5 @@
-# Use the official Alpine image as the base image
-FROM alpine:latest
+# Stage 1: Build and install Nginx with ModSecurity
+FROM alpine:latest AS builder
 
 # Install dependencies
 RUN apk update && apk add --no-cache \
@@ -38,7 +38,7 @@ RUN git clone --recursive --depth 1 -b v3.0.4 https://github.com/SpiderLabs/ModS
 # Clone the ModSecurity-nginx connector repository
 RUN git clone --depth 1 https://github.com/SpiderLabs/ModSecurity-nginx.git /usr/local/src/ModSecurity-nginx
 
-# Get the installed Nginx version
+# Get the installed Nginx version and download the matching Nginx source code
 RUN nginx_version=$(nginx -v 2>&1 | awk -F/ '{print $2}') \
     && echo "Nginx version: $nginx_version" \
     && cd /tmp \
@@ -50,13 +50,17 @@ RUN nginx_version=$(nginx -v 2>&1 | awk -F/ '{print $2}') \
     && mkdir -p /etc/nginx/modules \
     && cp objs/ngx_http_modsecurity_module.so /etc/nginx/modules
 
-# Clean up
-RUN apk del gcc g++ make libtool automake autoconf \
-    && rm -rf /var/cache/apk/* \
-    && rm -rf /usr/local/src/ModSecurity \
-    && rm -rf /usr/local/src/ModSecurity-nginx \
-    && rm -rf /tmp/nginx-$nginx_version \
-    && rm /tmp/nginx-$nginx_version.tar.gz
+# Stage 2: Final image
+FROM alpine:latest
+
+# Copy necessary files from builder stage
+COPY --from=builder /etc/nginx/modules/ngx_http_modsecurity_module.so /etc/nginx/modules/ngx_http_modsecurity_module.so
+
+# Install runtime dependencies
+RUN apk update && apk add --no-cache \
+    nginx \
+    openssl \
+    gettext
 
 # Copy Nginx configuration template
 COPY nginx/nginx.conf.template /etc/nginx/templates/nginx.conf.template
