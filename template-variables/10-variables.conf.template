@@ -1,0 +1,7 @@
+map $host $virtual_host {
+  default "$VIRTUAL_HOST";
+}
+
+map $host $external_ip {
+  default "$EXTERNAL_IP";
+}
